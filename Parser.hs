@@ -1,3 +1,7 @@
+import Control.Applicative (Alternative(..), many)
+import Control.Monad (MonadPlus(..))
+
+
 -- Define token data type (based on the lexer output)
 data TokenType = VAL | VAR | PRINTLN | READLN | IF | ELSE | WHILE | IDENTIFIER | NUMBER
                | PLUS | MINUS | MULT | DIV | LEQ | EQ | LEFT_PAREN | RIGHT_PAREN | EOF
@@ -19,10 +23,9 @@ data AST
   | Block [AST]
   deriving (Show)
 
--- Define the parser type
+-- Define the Parser type and instances
 newtype Parser a = Parser { parse :: [Token] -> Maybe (a, [Token]) }
 
--- Utility Functions
 instance Functor Parser where
   fmap f (Parser p) = Parser $ \input -> case p input of
       Nothing -> Nothing
@@ -40,6 +43,20 @@ instance Monad Parser where
   (Parser p) >>= f = Parser $ \input -> case p input of
       Nothing -> Nothing
       Just (result, rest) -> parse (f result) rest
+
+-- Make Parser an instance of Alternative
+instance Alternative Parser where
+  empty = Parser $ const Nothing
+  (Parser p1) <|> (Parser p2) = Parser $ \input -> case p1 input of
+      Nothing -> p2 input
+      success -> success
+
+-- Make Parser an instance of MonadPlus
+instance MonadPlus Parser where
+  mzero = empty
+  mplus = (<|>)
+
+-- Now <|> and many should work as expected
 
 -- Parser utilities
 match :: TokenType -> Parser Token
@@ -125,10 +142,12 @@ parseIf = do
     condition <- parseExpression
     _ <- consume RIGHT_PAREN "Expected ')' after if condition"
     thenBranch <- parseStatement
-    elseBranch <- optionalElse
+    elseBranch <- parseOptionalElse
     return $ IfNode condition thenBranch elseBranch
   where
-    optionalElse = (match ELSE >> parseStatement) <|> return Nothing
+    parseOptionalElse :: Parser (Maybe AST)
+    parseOptionalElse = (match ELSE >> (Just <$> parseStatement)) <|> pure Nothing
+
 
 parseWhile :: Parser AST
 parseWhile = do
