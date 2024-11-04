@@ -178,8 +178,8 @@ parseMain = do
     return $ Block statements
 
 -- Run the parser
---runParser :: Parser a -> [Token] -> Maybe a
---runParser p input = case parse p input of
---    Just (result, []) -> Just result
---    _ -> Nothing
+runParser :: Parser a -> [Token] -> Maybe a
+runParser p input = case parse p input of
+    Just (result, []) -> Just result
+    _ -> Nothing
 
